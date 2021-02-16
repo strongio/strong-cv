@@ -3,7 +3,7 @@ from typing import Optional, List
 import cv2
 import numpy as np
 
-from .detection import get_mask
+from .detection import get_detection_mask
 
 
 def detect_compute_sift(
@@ -25,9 +25,9 @@ def detect_compute_sift(
     if nfeatures > 0 and len(kp) > nfeatures:
         kp = kp[:nfeatures]
         des = des[:nfeatures]
-    if mask:
-        masked_index = keypoints_masking(img, mask)
-        kp = kp[masked_index]
+    if mask is not None:
+        masked_index = mask_keypoints(kp, mask)
+        kp = np.array(kp)[masked_index].tolist()
         des = des[masked_index]
     return kp, des
 
@@ -112,8 +112,8 @@ def detection_filtered_homography(
         dst_kp: Array of dst keypoints.
         good_matches: List of good matches.
     """
-    src_mask = get_mask(src_det) if src_det else None
-    dst_mask = get_mask(dst_det) if dst_det else None
+    src_mask = get_detection_mask(src_det, src_img.shape) if src_det else None
+    dst_mask = get_detection_mask(dst_det, dst_img.shape) if dst_det else None
 
     # SIFT + KNN Matching
     src_kp, src_des = detect_compute_sift(src_img, src_mask, nfeatures)
@@ -127,7 +127,7 @@ def detection_filtered_homography(
             good_points.append((m1.trainIdx, m1.queryIdx))
             good_matches.append(m1)
     _src_kp = np.float32([src_kp[i].pt for (_, i) in good_points])
-    _dst_kp = np.float32([dst_kp[i].pt for (_, i) in good_points])
+    _dst_kp = np.float32([dst_kp[i].pt for (i, _) in good_points])
 
     ransac_mask, homography = compute_ransac_homography(_src_kp, _dst_kp)
-    return homography, _src_kp, _dst_kp
+    return homography, _src_kp, _dst_kp, good_matches
