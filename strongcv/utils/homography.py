@@ -108,9 +108,6 @@ def detection_filtered_homography(
 
     Returns:
         homography: Homography matrix.
-        src_kp: Array of src keypoints.
-        dst_kp: Array of dst keypoints.
-        good_matches: List of good matches.
     """
     src_mask = get_detection_mask(src_det, src_img.shape[:2]) if src_det else None
     dst_mask = get_detection_mask(dst_det, dst_img.shape[:2]) if dst_det else None
@@ -130,4 +127,4 @@ def detection_filtered_homography(
     _dst_kp = np.float32([dst_kp[i].pt for (i, _) in good_points])
 
     ransac_mask, homography = compute_ransac_homography(_src_kp, _dst_kp)
-    return homography, _src_kp, _dst_kp, good_matches
+    return homography

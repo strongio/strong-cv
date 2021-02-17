@@ -45,10 +45,44 @@ class MOTDataGenerator:
         updated_bboxes = dict()
         points = np.ones((3, 2))
         for det_id, d in detections.items():
-            points[0] = [0, 0]  # d["bbox"][:2]
-            points[1] = [1080, 1920]  # d["bbox"][2:]
+            points[:2, 0] = d["bbox"][:2]
+            points[:2, 1] = d["bbox"][2:]
             updated_points = homography_matrix @ points
-            updated_points = (updated_points[:2] / updated_points[-1]).flatten()
-            updated_bboxes[det_id] = {"bbox": updated_points.astype(int).tolist()}
+            updated_points = (updated_points[:2] / updated_points[-1]).astype(int)
+            updated_bboxes[det_id] = {
+                "bbox": updated_points.flatten(order="F").tolist()
+            }
+
+        return updated_bboxes
+
+    def generate_mot_sequence(
+        self,
+        frame_id: int,
+        num_frames: Optional[int] = 5,
+        num_features: Optional[int] = 1000,
+    ):
+        """Generate a synthetic MOT sequence using homography
+
+        Args:
+            frame_id (int): Base frame id to sample.
+            num_frames (Optional[int]): Number of frames to use in the sequence.
+            num_features (Optional[int]): Number of features to compute homography.
+
+        Returns:
+            updated_bboxes: Dict of synthetic detections with track ids
+        """
+        base_img, base_det = self._load_img_and_detection(fid)
+        updated_bboxes = {
+            "1": {
+                det_id: {"bbox": d["bbox"], "score": d["score"]}
+                for det_id, d in base_det.items()
+            }
+        }
+        for i in range(2, num_frames + 1):
+            dst_img, dst_det = self._load_img_and_detection(fid + i)
+            homography = detection_filtered_homography(
+                dst_img, base_img, dst_det, base_det, nfeatures=num_features
+            )
+            updated_bboxes[i] = self._project_detections(homography, base_det)
 
         return updated_bboxes
