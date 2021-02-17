@@ -1,5 +1,6 @@
 import os
 import numpy as np
+from tqdm.auto import tqdm
 
 from ..io.video import Video
 from ..utils import load_json
@@ -55,6 +56,32 @@ class MOTDataGenerator:
             }
 
         return updated_bboxes
+
+    def generate_mot_sequences(
+        self,
+        start_frame: Optional[int] = 0,
+        downsample: Optional[int] = 100,
+        num_frames_per_sequence: Optional[int] = 5,
+        num_features: Optional[int] = 1000,
+        path_prefix: Optional[str] = "MOT",
+    ):
+        """Generate synthetic MOT sequences from a set of video frames.
+
+        Args:
+            start_frame (Optional[int]): Frame to start sampling.
+            downsample (Optional[int]): Frames to downsample.
+            num_frames_per_sequence (Optional[int]): Number of frames per sequence.
+            num_features (Optional[int]): Number of features to compute homography.
+            path_prefix (Optional[str]): MOT sequence output path prefix.
+        """
+        for frame_id in tqdm(range(start_frame, len(self.frame_paths, downsample))):
+            out_path = os.path.join(self.output_path, f"{path_prefix}_{frame_id}")
+            if not os.path.exists(out_path):
+                os.makedirs(out_path)
+                os.makedirs(os.path.join(out_path, "img1"))
+                os.makedirs(os.path.join(out_path, "gt"))
+
+            self.generate_mot_sequence(out_path, frame_id, num_frames, num_features)
 
     def generate_mot_sequence(
         self,
