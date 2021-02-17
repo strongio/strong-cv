@@ -16,9 +16,7 @@ class Video:
         self,
         input_path: str,
         output_path: str = ".",
-        output_fps: Optional[float] = None,
         label: str = "",
-        batch_size: Optional[int] = None,
         codec_fourcc: Optional[str] = None,
     ):
         self.input_path = input_path
@@ -28,6 +26,9 @@ class Video:
         self.output_video: Optional[cv2.VideoWriter] = None
 
         # Read input video
+        self._load_video()
+
+    def _load_video(self):
         if "~" in self.input_path:
             self.input_path = os.path.expanduser(self.input_path)
         if not os.path.isfile(self.input_path):
@@ -38,21 +39,11 @@ class Video:
             raise ValueError(f"'{self.input_path}' not supported by OpenCV")
         description = os.path.basename(self.input_path)
 
-        self.output_fps = (
-            output_fps
-            if output_fps is not None
-            else self.video_capture.get(cv2.CAP_PROP_FPS)
-        )
+        self.output_fps = self.video_capture.get(cv2.CAP_PROP_FPS)
 
         self.input_height = self.video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
         self.input_width = self.video_capture.get(cv2.CAP_PROP_FRAME_WIDTH)
         self.frame_counter = 0
-
-        # Setup possible batching
-        self.batch = None
-        self.batch_size = batch_size
-        if self.batch_size:
-            self.batch = deque(maxlen=self.batch_size)
 
         # Setup progress bar
         if self.label:
@@ -117,6 +108,7 @@ class Video:
             )
         self.video_capture.release()
         cv2.destroyAllWindows()
+        self._load_video()
 
     def show(self, frame: np.array, downsample_ratio: float = 1.0) -> int:
         # Resize to lower resolution for faster streaming over slow connections
