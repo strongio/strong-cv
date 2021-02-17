@@ -50,7 +50,8 @@ class MOTDataGenerator:
             updated_points = homography_matrix @ points
             updated_points = (updated_points[:2] / updated_points[-1]).astype(int)
             updated_bboxes[det_id] = {
-                "bbox": updated_points.flatten(order="F").tolist()
+                "bbox": updated_points.flatten(order="F").tolist(),
+                "score": d["score"],
             }
 
         return updated_bboxes
@@ -71,7 +72,7 @@ class MOTDataGenerator:
         Returns:
             updated_bboxes: Dict of synthetic detections with track ids
         """
-        base_img, base_det = self._load_img_and_detection(fid)
+        base_img, base_det = self._load_img_and_detection(frame_id)
         updated_bboxes = {
             "1": {
                 det_id: {"bbox": d["bbox"], "score": d["score"]}
@@ -79,7 +80,7 @@ class MOTDataGenerator:
             }
         }
         for i in range(2, num_frames + 1):
-            dst_img, dst_det = self._load_img_and_detection(fid + i)
+            dst_img, dst_det = self._load_img_and_detection(frame_id + i)
             homography = detection_filtered_homography(
                 dst_img, base_img, dst_det, base_det, nfeatures=num_features
             )
