@@ -14,12 +14,27 @@ from ..utils.homography import detection_filtered_homography
 class MOTDataGenerator:
     """Generate MOT-like data from static video detections"""
 
-    def __init__(self, video_file: str, detections_file: str, output_path: str):
-        self.video = Video(video_file)
-        self.video.extract_frames(os.path.join(output_path, "frames"))
-        self.detections = load_json(detections_file)
+    def __init__(self, input_path: str, detections_file: str, output_path: str):
         self.output_path = output_path
 
+        # Load/extract video or collect frame paths
+        if os.path.isfile(input_path):
+            self._extract_frames(input_path)
+        else:
+            self.frame_paths = sorted(
+                glob.glob(os.path.join(output_path, "frames/*.jpg"))
+            )
+        assert len(self.frame_paths) > 0
+
+        self.detections = load_json(detections_file)
+
+    def _extract_frames(self, input_path):
+        """Extract frames from video.
+
+        Args:
+            input_path (type): Video filepath.
+        """
+        Video(input_path).extract_frames(os.path.join(self.output_path, "frames"))
         self.frame_paths = sorted(glob.glob(os.path.join(output_path, "frames/*.jpg")))
 
     def _load_img_and_detection(self, fid: int):
