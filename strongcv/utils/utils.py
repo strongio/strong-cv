@@ -1,5 +1,24 @@
 import os
-from typing import Tuple
+import json
+from typing import Optional, Tuple, Union
+
+
+class NumpyArrayEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
+
+
+def load_json(path: str):
+    with open(path, "r") as f:
+        obj = json.load(f)
+    return obj
+
+
+def write_json(obj: Union[list, dict], path: str):
+    with open(path, "w") as f:
+        json.dump(obj, f, cls=NumpyArrayEncoder)
 
 
 def get_terminal_size(default: Tuple[int, int] = (80, 24)) -> Tuple[int, int]:

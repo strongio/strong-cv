@@ -112,8 +112,8 @@ def detection_filtered_homography(
         dst_kp: Array of dst keypoints.
         good_matches: List of good matches.
     """
-    src_mask = get_detection_mask(src_det, src_img.shape) if src_det else None
-    dst_mask = get_detection_mask(dst_det, dst_img.shape) if dst_det else None
+    src_mask = get_detection_mask(src_det, src_img.shape[:2]) if src_det else None
+    dst_mask = get_detection_mask(dst_det, dst_img.shape[:2]) if dst_det else None
 
     # SIFT + KNN Matching
     src_kp, src_des = detect_compute_sift(src_img, src_mask, nfeatures)
