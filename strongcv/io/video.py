@@ -101,30 +101,13 @@ class Video:
         # Cleanup
         self.clean_up()
 
-    def _iter_batch(self):
-        """Non-default iterator returning frames in batch"""
-        assert self.batch is not None
-        with self.progress_bar as progress_bar:
-            start = time.time()
-
-            while True:
-                self.batch.clear()
-                while len(self.batch) < self.batch.maxlen:
-                    self.frame_counter += 1
-                    ret, frame = self.video_capture.read()
-                    if ret is False or frame is None:
-                        break
-                    process_fps = self.frame_counter / (time.time() - start)
-                    progress_bar.update(
-                        self.task, advance=1, refresh=True, process_fps=process_fps
-                    )
-                    self.batch.append(frame)
-                yield list(self.batch)
-                if ret is False or frame is None:
-                    break
-
-        # Clean up
-        self.clean_up()
+    def extract_frames(
+        self, output_path: Optional[str] = None, prefix: Optional[str] = ""
+    ):
+        if output_path is None:
+            output_path = self.output_path
+        for i, frame in enumerate(self):
+            cv2.imwrite(os.path.join(output_path, f"{prefix}{i:05d}.jpg"), frame)
 
     def clean_up(self):
         if self.output_video is not None:
