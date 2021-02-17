@@ -97,6 +97,8 @@ class Video:
     ):
         if output_path is None:
             output_path = self.output_path
+        if not os.path.exists(output_path):
+            os.makedirs(output_path, exist_ok=True)
         for i, frame in enumerate(self):
             cv2.imwrite(os.path.join(output_path, f"{prefix}{i:05d}.jpg"), frame)
 

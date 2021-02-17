@@ -1,4 +1,8 @@
 import os
+import glob
+from typing import Optional
+
+import cv2
 import numpy as np
 from tqdm.auto import tqdm
 
@@ -12,11 +16,11 @@ class MOTDataGenerator:
 
     def __init__(self, video_file: str, detections_file: str, output_path: str):
         self.video = Video(video_file)
-        self.video.extract_frames(output_path)
+        self.video.extract_frames(os.path.join(output_path, "frames"))
         self.detections = load_json(detections_file)
         self.output_path = output_path
 
-        self.frame_paths = sorted(glob.glob(os.path.join(output_path, "*.jpg")))
+        self.frame_paths = sorted(glob.glob(os.path.join(output_path, "frames/*.jpg")))
 
     def _load_img_and_detection(self, fid: int):
         """Load image and corresponding detection from fid
@@ -29,7 +33,7 @@ class MOTDataGenerator:
             det: Detection dict
         """
         img = cv2.imread(self.frame_paths[fid])
-        det = detections[str(fid)]
+        det = self.detections[str(fid)]
         return img, det
 
     def _project_detections(self, homography_matrix: np.ndarray, detections: dict):
@@ -40,28 +44,28 @@ class MOTDataGenerator:
             detections (dict): Detections we want to project.
 
         Returns:
-            updated_bboxes: Dictionary of projected bounding boxes.
+            projected_detections: Dictionary of projected detections.
         """
         # Gather all points and project
-        updated_bboxes = dict()
+        projected_detections = dict()
         points = np.ones((3, 2))
         for det_id, d in detections.items():
             points[:2, 0] = d["bbox"][:2]
             points[:2, 1] = d["bbox"][2:]
-            updated_points = homography_matrix @ points
-            updated_points = (updated_points[:2] / updated_points[-1]).astype(int)
-            updated_bboxes[det_id] = {
-                "bbox": updated_points.flatten(order="F").tolist(),
+            projected_points = homography_matrix @ points
+            projected_points = (projected_points[:2] / projected_points[-1]).astype(int)
+            projected_detections[det_id] = {
+                "bbox": projected_points.flatten(order="F").tolist(),
                 "score": d["score"],
             }
 
-        return updated_bboxes
+        return projected_detections
 
     def generate_mot_sequences(
         self,
         start_frame: Optional[int] = 0,
         downsample: Optional[int] = 100,
-        num_frames_per_sequence: Optional[int] = 5,
+        num_frames: Optional[int] = 5,
         num_features: Optional[int] = 1000,
         path_prefix: Optional[str] = "MOT",
     ):
@@ -70,11 +74,11 @@ class MOTDataGenerator:
         Args:
             start_frame (Optional[int]): Frame to start sampling.
             downsample (Optional[int]): Frames to downsample.
-            num_frames_per_sequence (Optional[int]): Number of frames per sequence.
+            num_frames (Optional[int]): Number of frames per sequence.
             num_features (Optional[int]): Number of features to compute homography.
             path_prefix (Optional[str]): MOT sequence output path prefix.
         """
-        for frame_id in tqdm(range(start_frame, len(self.frame_paths, downsample))):
+        for frame_id in tqdm(range(start_frame, len(self.frame_paths), downsample)):
             out_path = os.path.join(self.output_path, f"{path_prefix}_{frame_id}")
             if not os.path.exists(out_path):
                 os.makedirs(out_path)
@@ -110,9 +114,11 @@ class MOTDataGenerator:
             projected_detections = self._project_detections(homography, base_det)
             for det_id, d in projected_detections.items():
                 mot_sequence[det_id][str(i)] = d
-            images.append(cv2.warpPerspective(base_img, h, base_img.shape[:2][::-1]))
+            images.append(
+                cv2.warpPerspective(base_img, homography, base_img.shape[:2][::-1])
+            )
 
-        self.write_mot_sequence(path, images, updated_bboxes)
+        self.write_mot_sequence(path, images, mot_sequence)
 
     def write_mot_sequence(self, path: str, images: list, mot_sequence: dict):
         """Write MOT sequence to file following MOTChallenge conventions
