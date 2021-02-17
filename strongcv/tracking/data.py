@@ -58,32 +58,60 @@ class MOTDataGenerator:
 
     def generate_mot_sequence(
         self,
+        path: str,
         frame_id: int,
         num_frames: Optional[int] = 5,
         num_features: Optional[int] = 1000,
     ):
-        """Generate a synthetic MOT sequence using homography
+        """Generate a synthetic MOT sequence using homography.
 
         Args:
             frame_id (int): Base frame id to sample.
             num_frames (Optional[int]): Number of frames to use in the sequence.
             num_features (Optional[int]): Number of features to compute homography.
-
-        Returns:
-            updated_bboxes: Dict of synthetic detections with track ids
         """
         base_img, base_det = self._load_img_and_detection(frame_id)
-        updated_bboxes = {
-            "1": {
-                det_id: {"bbox": d["bbox"], "score": d["score"]}
-                for det_id, d in base_det.items()
-            }
-        }
-        for i in range(2, num_frames + 1):
+        mot_sequence = dict()
+        for det_id, d in base_det.items():
+            mot_sequence[det_id] = {"0": {"bbox": d["bbox"], "score": d["score"]}}
+        images = [base_img]
+        for i in range(1, num_frames):
             dst_img, dst_det = self._load_img_and_detection(frame_id + i)
             homography = detection_filtered_homography(
                 dst_img, base_img, dst_det, base_det, nfeatures=num_features
             )
-            updated_bboxes[i] = self._project_detections(homography, base_det)
+            projected_detections = self._project_detections(homography, base_det)
+            for det_id, d in projected_detections.items():
+                mot_sequence[det_id][str(i)] = d
+            images.append(cv2.warpPerspective(base_img, h, base_img.shape[:2][::-1]))
 
-        return updated_bboxes
+        self.write_mot_sequence(path, images, updated_bboxes)
+
+    def write_mot_sequence(self, path: str, images: list, mot_sequence: dict):
+        """Write MOT sequence to file following MOTChallenge conventions
+
+        Args:
+            path (str): Output path for sequence.
+            images (list): List of images.
+            mot_sequence (dict): Sequence of track detections and ids
+        """
+        if not os.path.exists(path):
+            os.makedirs(path)
+            os.makedirs(os.path.join(path, "img1"))
+            os.makedirs(os.path.join(path, "gt"))
+
+        # Write images
+        for i, image in enumerate(images):
+            cv2.imwrite(os.path.join(path, f"img1/{i:05d}.jpg"), image)
+
+        # Write gt text
+        with open(os.path.join(path, "gt/gt.txt"), "w") as f:
+            for track_id, frame_detections in mot_sequence.items():
+                for frame_id, detection in frame_detections.items():
+                    x0, y0, x1, y1 = detection["bbox"]
+                    w = x1 - x0
+                    h = y1 - y0
+                    score = detection["score"]
+                    f.write(
+                        f"{int(frame_id)+1},{int(track_id)+1},{x0},{y0},{w},{h},1,1,1\n"
+                    )
