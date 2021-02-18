@@ -35,7 +35,9 @@ class MOTDataGenerator:
             input_path (type): Video filepath.
         """
         Video(input_path).extract_frames(os.path.join(self.output_path, "frames"))
-        self.frame_paths = sorted(glob.glob(os.path.join(output_path, "frames/*.jpg")))
+        self.frame_paths = sorted(
+            glob.glob(os.path.join(self.output_path, "frames/*.jpg"))
+        )
 
     def _load_img_and_detection(self, fid: int):
         """Load image and corresponding detection from fid
@@ -117,6 +119,8 @@ class MOTDataGenerator:
             num_features (Optional[int]): Number of features to compute homography.
         """
         base_img, base_det = self._load_img_and_detection(frame_id)
+        if len(base_det) == 0:
+            return
         mot_sequence = dict()
         for det_id, d in base_det.items():
             mot_sequence[det_id] = {"0": {"bbox": d["bbox"], "score": d["score"]}}
