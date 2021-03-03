@@ -31,7 +31,7 @@ class ImageDirectory:
     def _collect_frames(self, sort: Optional[bool] = True, ext: Optional[str] = ""):
         paths = glob.glob(f"{self.input_path}/*{ext}")
         if not ext:
-            paths = [p for p in paths if os.path.splitext(p)[-1] in self.ext]
+            paths = [p for p in paths if os.path.splitext(p)[-1].lower() in self.ext]
         if sort:
             paths = sorted(paths)
         return paths
