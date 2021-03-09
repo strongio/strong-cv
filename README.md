@@ -35,10 +35,10 @@ Collect frames in a particular directory
 ```python
 from strongcv.io.image import ImageDirectory
 
-img_directory = ImageDirectory("frames")
+frame_directory = ImageDirectory("frames")
 
-for image in img_directory:
+for frame in frame_directory:
 
-  # Do something, like pass it to a models
-  out = model(image)
+  # Do something, like pass it to a model
+  out = model(frame)
 ```
