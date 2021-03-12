@@ -1,11 +1,11 @@
 import os
 import time
+from collections import deque
 from typing import Optional
 
 import cv2
 import numpy as np
 
-from rich import print
 from rich.progress import BarColumn, Progress, TimeRemainingColumn, ProgressColumn
 
 from ..utils import get_terminal_size
@@ -17,16 +17,19 @@ class Video:
         input_path: str,
         output_path: str = ".",
         label: str = "",
+        batch_size: Optional[int] = None,
         codec_fourcc: Optional[str] = None,
     ):
         self.input_path = input_path
         self.output_path = output_path
         self.label = label
         self.codec_fourcc = codec_fourcc
+        self.batch_size = batch_size
         self.output_video: Optional[cv2.VideoWriter] = None
 
         # Read input video
         self._load_video()
+        self.console = self.pbar.console
 
     def _load_video(self):
         if "~" in self.input_path:
@@ -45,7 +48,15 @@ class Video:
         self.input_width = self.video_capture.get(cv2.CAP_PROP_FRAME_WIDTH)
         self.frame_counter = 0
 
-        # Setup progress bar
+        # Setup possible batching
+        self.batch = None
+        if self.batch_size:
+            self.batch = deque(maxlen=self.batch_size)
+
+        # Setup progressbar
+        self._init_progress_bar(description)
+
+    def _init_progress_bar(self, description: str):
         if self.label:
             description += f" | {self.label}"
         progress_bar_fields: List[Union[str, ProgressColumn]] = [
@@ -60,13 +71,13 @@ class Video:
             progress_bar_fields.insert(
                 3, TimeRemainingColumn(),
             )
-        self.progress_bar = Progress(
+        self.pbar = Progress(
             *progress_bar_fields,
             auto_refresh=False,
             redirect_stdout=False,
             redirect_stderr=False,
         )
-        self.task = self.progress_bar.add_task(
+        self.task = self.pbar.add_task(
             self.abbreviate_description(description),
             total=self.total_frames,
             start=self.input_path is not None,
@@ -74,7 +85,7 @@ class Video:
         )
 
     def __iter__(self):
-        with self.progress_bar as progress_bar:
+        with self.pbar as pbar:
             start = time.time()
 
             # Iterate over video
@@ -84,13 +95,35 @@ class Video:
                 if ret is False or frame is None:
                     break
                 process_fps = self.frame_counter / (time.time() - start)
-                progress_bar.update(
-                    self.task, advance=1, refresh=True, process_fps=process_fps
-                )
+                pbar.update(self.task, advance=1, refresh=True, process_fps=process_fps)
                 yield frame
 
-        # Cleanup
-        self.clean_up()
+        # Cleanup and reset
+        self.reset()
+
+    def _iter_batch(self):
+        assert self.batch is not None
+        with self.pbar as pbar:
+            start = time.time()
+
+            while True:
+                self.batch.clear()
+                while len(self.batch) < self.batch.maxlen:
+                    self.frame_counter += 1
+                    ret, frame = self.video_capture.read()
+                    if ret is False or frame is None:
+                        break
+                    process_fps = self.frame_counter / (time.time() - start)
+                    pbar.update(
+                        self.task, advance=1, refresh=True, process_fps=process_fps
+                    )
+                    self.batch.append(frame)
+                yield list(self.batch)
+                if ret is False or frame is None:
+                    break
+
+        # Clean up
+        self.reset()
 
     def extract_frames(
         self, output_path: Optional[str] = None, prefix: Optional[str] = ""
@@ -102,10 +135,10 @@ class Video:
         for i, frame in enumerate(self):
             cv2.imwrite(os.path.join(output_path, f"{prefix}{i:05d}.jpg"), frame)
 
-    def clean_up(self):
+    def reset(self):
         if self.output_video is not None:
             self.output_video.release()
-            print(
+            self.console.print(
                 f"[white]Output video file saved to: {self.get_output_file_path()}[/white]"
             )
         self.video_capture.release()
