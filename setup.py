@@ -12,5 +12,5 @@ setup(
     author_email="contact@strong.io",
     description="Computer Vision Utilities",
     packages=["strongcv"],
-    package_dir=["strongcv"],
+    package_dir={"strongcv": "strongcv"},
 )
