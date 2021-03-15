@@ -1,6 +1,6 @@
 import os
 import sys
-from setuptools import setup
+from setuptools import setup, find_packages
 
 
 setup(
@@ -11,6 +11,5 @@ setup(
     author="Strong Analytics",
     author_email="contact@strong.io",
     description="Computer Vision Utilities",
-    packages=["strongcv"],
-    package_dir={"strongcv": "strongcv"},
+    packages=find_packages(),
 )
